@@ -1,0 +1,35 @@
+{
+  "entities": {
+    "Player": {
+      "title": "Player",
+      "description": "Represents a participant in the quiz",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the player"
+        },
+        "xp": {
+          "type": "number",
+          "description": "Experience points accumulated"
+        },
+        "lvl": {
+          "type": "string",
+          "description": "Current level name"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the player's score was updated"
+        }
+      },
+      "required": ["name", "xp", "lvl", "lastUpdated"]
+    }
+  },
+  "firestore": {
+    "players": {
+      "schema": "Player",
+      "description": "Collection of players and their scores"
+    }
+  }
+}

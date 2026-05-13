@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Player Entity Validation
+    function isValidPlayer(data) {
+      return data.keys().hasAll(['name', 'xp', 'lvl', 'lastUpdated']) &&
+             data.keys().size() == 4 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.xp is number && data.xp >= 0 &&
+             data.lvl is string &&
+             data.lastUpdated is string;
+    }
+
+    match /players/{playerId} {
+      allow list: if true; // Public leaderboard
+      allow get: if true;
+      allow delete: if true;
+
+      allow create: if (
+        isValidId(playerId) && 
+        isValidPlayer(incoming())
+      );
+
+      allow update: if (
+        isValidId(playerId) &&
+        isValidPlayer(incoming()) && (
+          // Action: Update Score
+          incoming().diff(existing()).affectedKeys().hasOnly(['xp', 'lvl', 'lastUpdated', 'name'])
+        )
+      );
+    }
+  }
+}
