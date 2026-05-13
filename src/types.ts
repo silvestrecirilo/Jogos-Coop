@@ -26,6 +26,7 @@ export interface Player {
 
 export enum GameState {
   LOGIN = 'login',
+  START = 'start',
   PLAYING = 'playing',
   CARD_DISPLAY = 'card_display',
   CRISIS_DECISION = 'crisis_decision',

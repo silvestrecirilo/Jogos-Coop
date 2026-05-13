@@ -13,10 +13,12 @@ interface QuizProps {
 }
 
 export default function Quiz({ playerName, playerId }: QuizProps) {
-  const [gameState, setGameState] = useState<GameState>(GameState.PLAYING);
+  const [gameState, setGameState] = useState<GameState>(GameState.START);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [shuffledQuestions, setShuffledQuestions] = useState<Question[]>([]);
   const [xp, setXp] = useState(100);
   const [streak, setStreak] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
   const [history, setHistory] = useState<{ questionId: number, xpResult: number, isCorrect: boolean }[]>([]);
   const [lastCard, setLastCard] = useState<Card | null>(null);
   const [showCard, setShowCard] = useState(false);
@@ -26,11 +28,32 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
   const [wildcardUnlocked, setWildcardUnlocked] = useState(false);
 
   const currentLevel = getLevel(xp);
-  const currentQuestion = gameState === GameState.WILDCARD ? WILDCARD_QUESTION : QUESTIONS[currentQuestionIndex];
+  const currentQuestion = gameState === GameState.WILDCARD ? WILDCARD_QUESTION : shuffledQuestions[currentQuestionIndex];
 
-  // Randomly shuffle questions once if needed, but the prompt says 15 questions (10 easy + 5 medium)
-  // I'll stick to the provided order but we can shuffle the easy/medium blocks if we want.
-  // For now, I'll follow the logical progression.
+  useEffect(() => {
+    // Shuffle questions and their options once at game start
+    const shuffleArray = <T,>(array: T[]) => {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    const randomizedQuestions = shuffleArray(QUESTIONS).map(q => {
+      const originalCorrectOption = q.options[q.correctAnswer];
+      const shuffledOptions = shuffleArray(q.options);
+      const newCorrectIndex = shuffledOptions.indexOf(originalCorrectOption);
+      return {
+        ...q,
+        options: shuffledOptions,
+        correctAnswer: newCorrectIndex
+      };
+    });
+
+    setShuffledQuestions(randomizedQuestions);
+  }, []);
 
   useEffect(() => {
     // Update score in Firestore
@@ -63,6 +86,10 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
     const newStreak = isCorrect ? streak + 1 : 0;
     setStreak(newStreak);
     
+    if (isCorrect) {
+      setCorrectCount(prev => prev + 1);
+    }
+    
     if (newStreak >= 3) {
       xpChange += 10;
     }
@@ -80,6 +107,11 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
 
     // Wildcard check
     if (newStreak === 10 && !wildcardUnlocked) {
+      setWildcardUnlocked(true);
+    }
+
+    // Super Wildcard check (all 15 correct)
+    if (isCorrect && correctCount + 1 === 15) {
       setWildcardUnlocked(true);
     }
   };
@@ -141,6 +173,34 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
       setCurrentQuestionIndex(nextIndex);
     }
   };
+
+  if (gameState === GameState.START || !currentQuestion) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center p-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-xl w-full bg-white border-4 border-brand-text p-8 sm:p-12 rounded-[40px] shadow-[16px_16px_0px_0px_#17382E] text-center space-y-8"
+        >
+          <div className="w-20 h-20 bg-brand-accent rounded-3xl border-4 border-brand-text flex items-center justify-center text-4xl mx-auto shadow-[4px_4px_0px_0px_#17382E]">
+            🎓
+          </div>
+          <div className="space-y-4">
+            <h1 className="text-4xl font-black text-brand-text uppercase tracking-tighter italic">Líder da Convivência</h1>
+            <p className="text-lg text-brand-muted font-bold leading-relaxed">
+              Responda a 15 desafios sobre a Pedagogia da Convivência. Acertos consecutivos e performance total liberam cartas coringas!
+            </p>
+          </div>
+          <button 
+            onClick={() => setGameState(GameState.PLAYING)}
+            className="w-full py-5 bg-brand-primary text-white font-black uppercase tracking-widest rounded-[24px] border-b-8 border-brand-text hover:translate-y-1 transition-all cursor-pointer text-xl"
+          >
+            Começar Desafio
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (gameState === GameState.FINISHED) {
     return (
@@ -260,12 +320,15 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
                     <Zap className="w-4 h-4 text-brand-accent" /> Carta Coringa Desbloqueada!
                   </div>
                   <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-brand-text uppercase tracking-tighter leading-tight italic break-words">
-                    Mestria em Convivência
+                    {correctCount === 15 ? "Maestria Suprema" : "Mestria em Convivência"}
                   </h2>
                 </div>
 
                 <p className="text-lg sm:text-xl text-brand-muted leading-relaxed max-w-2xl font-bold">
-                  Sua fluência na Pedagogia da Convivência é notável! Com um streak de 10 acertos, você atingiu um patamar de excelência. Como deseja direcionar sua liderança agora?
+                  {correctCount === 15 
+                    ? "Incrível! Você atingiu a pontuação máxima de 100% de acertos. Sua compreensão da Pedagogia da Convivência é um exemplo de excelência. Qual legado deseja deixar?"
+                    : "Sua fluência na Pedagogia da Convivência é notável! Com sua performance de destaque, você atingiu um patamar de excelência. Como deseja direcionar sua liderança agora?"
+                  }
                 </p>
 
                 <div className="grid md:grid-cols-2 gap-6 pt-4">
@@ -277,30 +340,38 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, scale: 0.9 }}
-                          onClick={() => handleWildcardDecision(50, "Multiplicador Social")}
+                          onClick={() => handleWildcardDecision(correctCount === 15 ? 100 : 50, correctCount === 15 ? "Semeador de Paz" : "Multiplicador Social")}
                           className="p-8 bg-white border-4 border-brand-text rounded-3xl text-left transition-all group shadow-[0px_8px_0px_0px_#17382E] hover:translate-y-1 hover:shadow-none cursor-pointer"
                         >
                           <div className="font-black text-lg uppercase tracking-tight mb-2 group-hover:text-brand-primary transition-colors">
-                            Multiplicador Social
+                            {correctCount === 15 ? "Semeador de Paz" : "Multiplicador Social"}
                           </div>
                           <div className="text-xs text-brand-muted font-bold leading-relaxed">
-                            Expandir os horizontes e inspirar outros facilitadores com suas práticas exitosas.
+                            {correctCount === 15
+                              ? "Transformar realidades sociais através da resolução pacífica de conflitos em larga escala."
+                              : "Expandir os horizontes e inspirar outros facilitadores com suas práticas exitosas."
+                            }
                           </div>
+                          <div className="mt-4 text-sm font-black text-brand-success">+{correctCount === 15 ? 100 : 50} XP</div>
                         </motion.button>
                         <motion.button 
                           key="wild2"
                           initial={{ opacity: 0, x: 20 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, scale: 0.9 }}
-                          onClick={() => handleWildcardDecision(50, "Pilar Comunitário")}
+                          onClick={() => handleWildcardDecision(correctCount === 15 ? 100 : 50, correctCount === 15 ? "Guardião da Ética" : "Pilar Comunitário")}
                           className="p-8 bg-white border-4 border-brand-text rounded-3xl text-left transition-all group shadow-[0px_8px_0px_0px_#17382E] hover:translate-y-1 hover:shadow-none cursor-pointer"
                         >
                           <div className="font-black text-lg uppercase tracking-tight mb-2 group-hover:text-brand-primary transition-colors">
-                            Pilar Comunitário
+                            {correctCount === 15 ? "Guardião da Ética" : "Pilar Comunitário"}
                           </div>
                           <div className="text-xs text-brand-muted font-bold leading-relaxed">
-                            Focar no aprofundamento dos vínculos e na segurança psicológica do seu grupo atual.
+                            {correctCount === 15
+                              ? "Zelar pelos valores humanos e pela dignidade em todos os processos educativos comunitários."
+                              : "Focar no aprofundamento dos vínculos e na segurança psicológica do seu grupo atual."
+                            }
                           </div>
+                          <div className="mt-4 text-sm font-black text-brand-success">+{correctCount === 15 ? 100 : 50} XP</div>
                         </motion.button>
                       </>
                     ) : (
