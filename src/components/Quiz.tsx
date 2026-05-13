@@ -21,6 +21,7 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
   const [lastCard, setLastCard] = useState<Card | null>(null);
   const [showCard, setShowCard] = useState(false);
   const [crisisActive, setCrisisActive] = useState(false);
+  const [wildcardActive, setWildcardActive] = useState(false);
   const [crisisFeedback, setCrisisFeedback] = useState<{ impact: number, choice: string } | null>(null);
   const [wildcardUnlocked, setWildcardUnlocked] = useState(false);
 
@@ -86,6 +87,13 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
   const nextStep = () => {
     setShowCard(false);
     
+    if (wildcardUnlocked && !wildcardActive) {
+      setWildcardActive(true);
+      setGameState(GameState.WILDCARD_DECISION);
+      setWildcardUnlocked(false);
+      return;
+    }
+
     const nextIndex = currentQuestionIndex + 1;
     
     // Crisis check (rounds 4, 8, 12, 14)
@@ -99,7 +107,6 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
 
     if (wildcardUnlocked && nextIndex === 15) {
       setGameState(GameState.WILDCARD);
-      setWildcardUnlocked(false); // only once
       return;
     }
 
@@ -116,8 +123,14 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
     setCrisisFeedback({ impact, choice });
   };
 
+  const handleWildcardDecision = (impact: number, choice: string) => {
+    setXp(prev => Math.max(0, prev + impact));
+    setCrisisFeedback({ impact, choice });
+  };
+
   const finishCrisis = () => {
     setCrisisActive(false);
+    setWildcardActive(false);
     setCrisisFeedback(null);
     setGameState(GameState.PLAYING);
     // Move to next question after decision
@@ -230,7 +243,97 @@ export default function Quiz({ playerName, playerId }: QuizProps) {
         {/* Main Quiz Area */}
         <div className="lg:col-span-3 flex flex-col gap-6 w-full overflow-x-hidden">
           <AnimatePresence mode="wait">
-            {gameState === GameState.CRISIS_DECISION ? (
+            {gameState === GameState.WILDCARD_DECISION ? (
+              <motion.div
+                key="wildcard_decision"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-brand-accent/20 border-4 border-brand-accent p-8 md:p-12 rounded-[40px] space-y-8 relative overflow-hidden brutalist-shadow-lg"
+              >
+                <div className="absolute top-0 right-0 p-8 opacity-10">
+                  <Award className="w-64 h-64 text-brand-accent" />
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-primary text-white rounded-full text-[10px] font-black uppercase tracking-widest">
+                    <Zap className="w-4 h-4 text-brand-accent" /> Carta Coringa Desbloqueada!
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-brand-text uppercase tracking-tighter leading-tight italic break-words">
+                    Mestria em Convivência
+                  </h2>
+                </div>
+
+                <p className="text-lg sm:text-xl text-brand-muted leading-relaxed max-w-2xl font-bold">
+                  Sua fluência na Pedagogia da Convivência é notável! Com um streak de 10 acertos, você atingiu um patamar de excelência. Como deseja direcionar sua liderança agora?
+                </p>
+
+                <div className="grid md:grid-cols-2 gap-6 pt-4">
+                  <AnimatePresence mode="wait">
+                    {!crisisFeedback ? (
+                      <>
+                        <motion.button 
+                          key="wild1"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          onClick={() => handleWildcardDecision(50, "Multiplicador Social")}
+                          className="p-8 bg-white border-4 border-brand-text rounded-3xl text-left transition-all group shadow-[0px_8px_0px_0px_#17382E] hover:translate-y-1 hover:shadow-none cursor-pointer"
+                        >
+                          <div className="font-black text-lg uppercase tracking-tight mb-2 group-hover:text-brand-primary transition-colors">
+                            Multiplicador Social
+                          </div>
+                          <div className="text-xs text-brand-muted font-bold leading-relaxed">
+                            Expandir os horizontes e inspirar outros facilitadores com suas práticas exitosas.
+                          </div>
+                        </motion.button>
+                        <motion.button 
+                          key="wild2"
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          onClick={() => handleWildcardDecision(50, "Pilar Comunitário")}
+                          className="p-8 bg-white border-4 border-brand-text rounded-3xl text-left transition-all group shadow-[0px_8px_0px_0px_#17382E] hover:translate-y-1 hover:shadow-none cursor-pointer"
+                        >
+                          <div className="font-black text-lg uppercase tracking-tight mb-2 group-hover:text-brand-primary transition-colors">
+                            Pilar Comunitário
+                          </div>
+                          <div className="text-xs text-brand-muted font-bold leading-relaxed">
+                            Focar no aprofundamento dos vínculos e na segurança psicológica do seu grupo atual.
+                          </div>
+                        </motion.button>
+                      </>
+                    ) : (
+                      <motion.div 
+                        key="feedback_wildcard"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="col-span-full bg-white border-4 border-brand-text p-8 rounded-3xl shadow-[0px_8px_0px_0px_#17382E] text-center space-y-6"
+                      >
+                        <div className="flex justify-center">
+                          <div className="w-16 h-16 rounded-2xl flex items-center justify-center border-4 border-brand-text bg-brand-accent">
+                            <Zap className="w-8 h-8 text-brand-primary" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Você escolheu</div>
+                          <div className="text-2xl font-black text-brand-text uppercase italic">{crisisFeedback.choice}</div>
+                        </div>
+                        <div className="text-4xl font-black font-mono text-brand-text">
+                          +{crisisFeedback.impact} XP
+                        </div>
+                        <button 
+                          onClick={finishCrisis}
+                          className="w-full py-4 bg-brand-primary text-white font-black uppercase tracking-widest rounded-2xl border-b-4 border-brand-text hover:translate-y-1 transition-all cursor-pointer"
+                        >
+                          Continuar Jornada
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            ) : gameState === GameState.CRISIS_DECISION ? (
               <motion.div
                 key="crisis"
                 initial={{ opacity: 0, y: 20 }}

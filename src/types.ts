@@ -30,6 +30,7 @@ export enum GameState {
   CARD_DISPLAY = 'card_display',
   CRISIS_DECISION = 'crisis_decision',
   WILDCARD = 'wildcard',
+  WILDCARD_DECISION = 'wildcard_decision',
   FINISHED = 'finished'
 }
 
